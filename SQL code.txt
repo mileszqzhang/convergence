@@ -1,0 +1,111 @@
+哪种产品销售额更高？：
+SELECT c.CategoryID as ID, c.CategoryName AS Catergory, SUM(od.Quantity) AS sales_volume
+FROM Products p JOIN OrderDetails od ON p.ProductID=od.ProductID
+JOIN Categories c ON p.CategoryID=c.CategoryID
+GROUP BY c.CategoryID,c.CategoryName
+ORDER BY sales_volume
+
+各类产品销售额TOP3：
+WITH CSA AS(
+SELECT c.CategoryName, p.ProductName,SUM(od.Quantity*od.Unitprice) AS sales_amount
+FROM Products p JOIN OrderDetails od ON p.ProductID=od.ProductID
+JOIN Categories c ON p.CategoryID=c.CategoryID
+GROUP BY c.CategoryName, p.ProductName
+ORDER BY sales_amount)
+
+SELECT CategoryName,ProductName,sales_amount
+FROM
+(SELECT CategoryName,ProductName,sales_amount,RANK() OVER (PARTITION BY CategoryName ORDER BY sales_amount DESC) rank_of_sales
+FROM CSA)sub
+WHERE rank_of_sales <=3
+ORDER BY CategoryName,sales_amount
+
+各类产品的销售额如何变化？：
+SELECT substr(year_month,1,4)||'-'||'Q'||quater AS quater_of_year,
+	   Category_name, SUM(sales_amount) AS sales_amount
+FROM
+(SELECT strftime('%Y-%m',o.OrderDate) AS year_month,
+		CASE WHEN strftime('%m',o.OrderDate) IN ('01','02','03') THEN 1
+			 WHEN strftime('%m',o.OrderDate) IN ('04','05','06') THEN 2
+			 WHEN strftime('%m',o.OrderDate) IN ('07','08','09') THEN 3
+			 ELSE 4 END AS quater,
+		c.CategoryName AS category_name,SUM(od.Unitprice*od.Quantity) sales_amount
+FROM Products p JOIN OrderDetails od ON p.ProductID=od.ProductID
+JOIN Categories c ON p.CategoryID=C.CategoryID
+JOIN Orders o ON o.OrderId=od.OrderId
+GROUP BY year_month,category_name
+ORDER BY year_month,category_name,sales_amount)sub
+GROUP BY quater_of_year, category_name
+
+我们的客户主要分布在什么地方？
+SELECT Country, COUNT(*) 
+FROM Customers
+GROUP BY Country
+order by  COUNT(*) DESC
+
+哪些地区的客户对我们的营收贡献最大？
+SELECT c.country, sum(od.quantity*od.unitprice) AS sales_amount,COUNT(o.orderID) , sum(od.quantity) AS quantity
+FROM orders o join Customers c ON c.CustomerID=o.CustomerID
+JOIN OrderDetails od ON od.OrderId=o.OrderId
+GROUP BY c.Country
+ORDER BY sales_amount DESC
+
+各国客户的消费结构：
+SELECT c.Country, ca.CategoryName,sum(od.quantity*od.unitprice) AS sales_amount
+FROM Customers c JOIN Orders o ON c.CustomerID=o.CustomerID
+JOIN OrderDetails od ON o.OrderId=od.OrderId
+JOIN Products p ON p.ProductID=od.ProductID
+JOIN Categories ca ON ca.CategoryID=p.CategoryID
+GROUP BY c.Country, ca.CategoryName
+
+消费额占前10%的大客户有哪些？：
+WITH details AS(
+SELECT c.CustomerID,c.CompanyName, 
+	   COUNT(o.OrderID) AS frequency_of_consumption,
+	   SUM(od.Quantity) AS number_of_item,
+	   SUM(od.Quantity*od.UnitPrice) AS sales_amount
+FROM Orders o JOIN Customers c ON o.CustomerID=c.CustomerID
+JOIN OrderDetails od ON od.OrderId=o.OrderId
+GROUP BY c.CustomerID,c.CompanyName
+ORDER BY sales_amount DESC)
+
+SELECT  *
+FROM
+(SELECT *,ntile(10) OVER (ORDER BY sales_amount) AS NTILES
+FROM details )sub
+WHERE NTILES=10
+ORDER BY SALES_AMOUNT DESC
+
+我们的供应商主要分布在哪里？：
+SELECT Country,COUNT(*)
+FROM Suppliers
+GROUP BY Country
+ORDER BY COUNT(*) DESC
+
+
+哪些供应商供应了我们大部分销售的产品？
+SELECT  s.SupplierID,s.CompanyName, SUM(OD.QUANTITY) AS Quantity
+FROM Suppliers s JOIN Products p ON s.SupplierID=p.SupplierID
+JOIN OrderDetails od ON od.ProductID=p.ProductID
+GROUP BY s.SupplierID,s.CompanyName
+ORDER BY Quantity DESC
+
+哪些雇员表现较好？
+SELECT  e.EmployeeID, e.FirstName||' '||e.LastName AS name, COUNT(c.CustomerID),SUM(od.quantity*od.unitprice)
+FROM Employees e JOIN Orders o ON e.EmployeeID=o.EmployeeID
+JOIN OrderDetails od ON o.OrderId=od.OrderId
+JOIN Customers c ON c.CustomerID=o.CustomerID
+GROUP BY e.EmployeeID,name
+ORDER BY SUM(od.quantity*od.unitprice) DESC
+
+雇员表现的变化：
+SELECT strftime('%Y-%m',o.orderdate) AS year_month, e.FirstName||' '||e.LastName AS name,sum(od.quantity*od.unitprice) AS sales_amount
+FROM Employees e JOIN Orders o ON e.EmployeeID=o.EmployeeID
+JOIN OrderDetails od ON o.OrderId=od.OrderId
+JOIN Customers c ON c.CustomerID=o.CustomerID
+GROUP BY year_month, e.EmployeeID
+ORDER BY year_month
+
+
+
+
